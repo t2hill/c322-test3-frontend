@@ -38,8 +38,9 @@
       <div id="quiz"></div>
     </div>
 
+    <script src="configuration.js"></script>
     <script>
-      let host = "http://localhost:8080";
+      let host = getHost();
       let questions = [];
       let list = document.getElementById("list");
       let quiz = document.getElementById("quiz");
@@ -51,54 +52,98 @@
       displayTheQuestions();
 
       async function getAll() {
-        let response = await fetch(host + "/questions");
-        let result = await response.json();
-        return result;
+        const headers = {"Authorization": `Bearer ${configuration.token()}`};
+        let response = await fetch(host + "/questions", { headers });
+        if (response.status == 401) {
+          logout();
+        }
+        return response.json();
       }
 
       async function displayTheQuestions() {
         if (questions.length == 0) {
           questions = await getAll();
         }
+
+        let list = document.getElementById("list");
         list.innerHTML = "";
+
         for (let question of questions) {
           let div = document.createElement("div");
-          div.id = `${question.id}`;
-          div.onclick = function () {
-            if (div.parentNode.id == "list") {
-              quiz.appendChild(div);
-              quizQuestions.push(div.id);
-            } else {
-              list.appendChild(div);
-              const index = quizQuestions.indexOf(div.id);
-              quizQuestions.splice(index, 1);
-            }
-            let n = quiz.childElementCount;
-            quizHeader.innerText = `The new quiz(${n} questions)`;
-            console.log(quizQuestions);
-          };
           div.className = "card";
-          let innerHtml = `
-       
-      <img src="http://localhost:8080/questions/${question.id}/image" alt="question" style="width:100%">
-      <div class="container">
-        <h4><b>${question.id}</b></h4> 
-        <p>${question.description}</p>
-        <form>
-            <input type="radio" id="q${question.id}ptionA" name="q2Answer" value="A">
-            <label for="q${question.id}ptionA">${question.choices[0]}</label><br>
 
-            <input type="radio" id="q${question.id}ptionB" name="q2Answer" value="B">
-            <label for="q${question.id}ptionB">${question.choices[1]}</label><br>
+          // Construct the image URL
+          const imageUrl = `http://localhost:8080/questions/${question.id}/image`;
 
-            <input type="radio" id="q${question.id}ptionC" name="q2Answer" value="C">
-            <label for="q${question.id}ptionC">${question.choices[2]}</label><br>       
-        </form> 
-      </div>
-   
-          `;
-          div.innerHTML = innerHtml;
-          list.appendChild(div);
+          // Fetch the image data as a blob
+          fetch(imageUrl, {
+              headers: {
+                  'Authorization': `Bearer ${configuration.token()}`
+              }
+          })
+          .then(response => {
+              if (response.status == 302) {
+                  return response.blob(); // Convert response to blob
+              } else {
+                  throw new Error('Failed to fetch image');
+              }
+          })
+          .then(blob => {
+              // Create object URL from the blob
+              const blobUrl = URL.createObjectURL(blob);
+              // Create image element and set source to the blob URL
+              const imgElement = document.createElement('img');
+              imgElement.src = blobUrl;
+              imgElement.alt = 'question';
+              imgElement.style.width = '100%';
+
+              // Construct rest of the HTML for the card
+              const innerHtml = `
+                  <div class="container">
+                      <h4><b>${question.id}</b></h4> 
+                      <p>${question.description}</p>
+                      <form>
+                          <input type="radio" id="q${question.id}ptionA" name="q2Answer" value="A">
+                          <label for="q${question.id}ptionA">${question.choices[0]}</label><br>
+
+                          <input type="radio" id="q${question.id}ptionB" name="q2Answer" value="B">
+                          <label for="q${question.id}ptionB">${question.choices[1]}</label><br>
+
+                          <input type="radio" id="q${question.id}ptionC" name="q2Answer" value="C">
+                          <label for="q${question.id}ptionC">${question.choices[2]}</label><br>       
+                      </form> 
+                  </div>
+              `;
+
+              // Append image and rest of the HTML to the card
+              div.innerHTML = innerHtml;
+              div.insertBefore(imgElement, div.firstChild); // Insert image before other content
+              list.appendChild(div);
+          })
+          .catch(error => {
+              // Construct rest of the HTML for the card
+              const innerHtml = `
+                  <div class="container">
+                      <h4><b>${question.id}</b></h4> 
+                      <p>${question.description}</p>
+                      <form>
+                          <input type="radio" id="q${question.id}ptionA" name="q2Answer" value="A">
+                          <label for="q${question.id}ptionA">${question.choices[0]}</label><br>
+
+                          <input type="radio" id="q${question.id}ptionB" name="q2Answer" value="B">
+                          <label for="q${question.id}ptionB">${question.choices[1]}</label><br>
+
+                          <input type="radio" id="q${question.id}ptionC" name="q2Answer" value="C">
+                          <label for="q${question.id}ptionC">${question.choices[2]}</label><br>       
+                      </form> 
+                  </div>
+              `;
+
+              // Append image and rest of the HTML to the card
+              div.innerHTML = innerHtml;
+              list.appendChild(div);
+              console.error(`Error fetching image: ${error}`);
+          });
         }
       }
 
@@ -112,6 +157,7 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "Authorization": `Bearer ${configuration.token()}`
             },
             body: JSON.stringify({"title": quizTitle, "questionIds": quizQuestions}),
           };
@@ -121,6 +167,7 @@
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
+              "Authorization": `Bearer ${configuration.token()}`
             },
             body: JSON.stringify({"id": quizId, "title": quizTitle, "questionIds": quizQuestions}),
           };
